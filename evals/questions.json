@@ -1,0 +1,18 @@
+[
+  { "question": "What is policy HR-214?", "page": 1, "kind": "exact" },
+  { "question": "Are contractors covered by the remote work policy?", "page": 1, "kind": "exact" },
+  { "question": "Can people who work in a lab go fully remote?", "page": 1, "kind": "paraphrase" },
+  { "question": "How do I request remote work? Which form?", "page": 2, "kind": "exact" },
+  { "question": "How long until I hear back after asking to work from home?", "page": 2, "kind": "paraphrase" },
+  { "question": "What are the core hours?", "page": 3, "kind": "exact" },
+  { "question": "Can I spend a few weeks working from Portugal?", "page": 3, "kind": "paraphrase" },
+  { "question": "How fast do I have to answer a direct message during the day?", "page": 3, "kind": "paraphrase" },
+  { "question": "How much is the home office stipend and how often does it renew?", "page": 4, "kind": "exact" },
+  { "question": "Will the company pay for my broadband?", "page": 4, "kind": "paraphrase" },
+  { "question": "What is the deadline for submitting expenses in Expensify?", "page": 4, "kind": "exact" },
+  { "question": "What happens if my work computer gets stolen?", "page": 5, "kind": "paraphrase" },
+  { "question": "Can I keep client files on my personal phone?", "page": 5, "kind": "paraphrase" },
+  { "question": "When must the laptop screen lock?", "page": 5, "kind": "exact" },
+  { "question": "What is the nightly hotel limit for team summits?", "page": 6, "kind": "exact" },
+  { "question": "Which days are hybrid staff expected in the office?", "page": 6, "kind": "paraphrase" }
+]
