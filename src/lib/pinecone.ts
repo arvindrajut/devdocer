@@ -5,12 +5,6 @@ import {Document, RecursiveCharacterTextSplitter} from '@pinecone-database/doc-s
 import { getEmbeddings } from './embeddings';
 import md5 from 'md5'
 import { convertToAscii } from './utils';
-// const client = new QdrantClient({
-//     url: 'https://81340e62-8564-4f0d-8fd1-c3cf6a0655fe.us-east-1-0.aws.cloud.qdrant.io:6333',
-//     apiKey: 'vesaaToXPxik-jkmkSUSJB2gYHan57I6PFtYN8he0XrLdiQXfR3xcg',
-// });
-// const result = await client.getCollections();
-// console.log('List of collections:', result.collections);
 
 type PDFPage = {
     pageContent: string;
