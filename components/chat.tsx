@@ -4,16 +4,22 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from 'ai';
 import { AlertCircle, ArrowUp, FileSearch, RotateCcw, Square } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { searchDocument, type LoadedDocument } from '@/lib/client/ingest';
+import { getOutline, readPage, searchOutput, toPassage, type ToolName } from '@/lib/agent/tools';
+import { citedIds } from '@/lib/citations';
+import { searchDocument, verifyAnswer, type LoadedDocument } from '@/lib/client/ingest';
 import { LIMITS } from '@/lib/config';
 import type { SearchHit } from '@/lib/search';
+import type { GroundingReport } from '@/lib/verify';
 import { MessageView } from './message';
 
 export type ChatMetadata = { model?: string; totalTokens?: number; latencyMs?: number };
 export type ChatMessage = UIMessage<ChatMetadata>;
 export type SearchTrace = { hits: SearchHit[]; ms: number };
+export type SelfCheck = { status: 'checking' } | { status: 'done'; report: GroundingReport } | { status: 'error'; message: string };
 
 const FALLBACK_QUESTIONS = ['What is this document about?', 'What are the most important numbers in it?', 'Who does it apply to?'];
+
+const textOf = (message: ChatMessage) => message.parts.map((part) => (part.type === 'text' ? part.text : '')).join('');
 
 function readableError(error: Error): string {
   try {
@@ -26,6 +32,7 @@ function readableError(error: Error): string {
 export function Chat({ doc, onCite }: { doc: LoadedDocument; onCite: (id: number) => void }) {
   const [input, setInput] = useState('');
   const [traces, setTraces] = useState<Record<string, SearchTrace>>({});
+  const [checks, setChecks] = useState<Record<string, SelfCheck>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const transport = useMemo(
@@ -39,32 +46,47 @@ export function Chat({ doc, onCite }: { doc: LoadedDocument; onCite: (id: number
     [doc],
   );
 
+  /** After an answer finishes, check each cited claim against the passage it cites. */
+  const selfCheck = (message: ChatMessage, history: ChatMessage[]) => {
+    const answer = textOf(message);
+    const passages = citedIds(answer)
+      .map((id) => doc.index.chunk(id))
+      .filter((chunk) => chunk !== undefined)
+      .slice(0, LIMITS.maxVerifyPassages)
+      .map(toPassage);
+    if (!passages.length) return;
+    const question = textOf(history.findLast((m) => m.role === 'user') ?? message).slice(0, LIMITS.maxQuestionChars);
+    setChecks((all) => ({ ...all, [message.id]: { status: 'checking' } }));
+    verifyAnswer(question, answer.slice(0, LIMITS.maxAnswerChars), passages)
+      .then((report) => setChecks((all) => ({ ...all, [message.id]: { status: 'done', report } })))
+      .catch((err: Error) => setChecks((all) => ({ ...all, [message.id]: { status: 'error', message: err.message } })));
+  };
+
   const { messages, sendMessage, addToolOutput, status, error, stop, regenerate, clearError } = useChat<ChatMessage>({
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
-    // searchDocument runs here, in the browser, against the in-memory hybrid index.
+    // The agent's tools run here, in the browser, against the in-memory index.
     async onToolCall({ toolCall }) {
-      if (toolCall.dynamic || toolCall.toolName !== 'searchDocument') return;
-      const { query } = toolCall.input as { query: string };
+      if (toolCall.dynamic) return;
+      const tool = toolCall.toolName as ToolName;
+      const { toolCallId } = toolCall;
       try {
-        const { hits, ms } = await searchDocument(doc, query);
-        setTraces((all) => ({ ...all, [toolCall.toolCallId]: { hits, ms } }));
-        addToolOutput({
-          tool: 'searchDocument',
-          toolCallId: toolCall.toolCallId,
-          output: {
-            query,
-            passages: hits.map((hit) => ({ id: `S${hit.chunk.id}`, page: hit.chunk.page, text: hit.chunk.text })),
-          },
-        });
+        if (tool === 'searchDocument') {
+          const { query } = toolCall.input as { query: string };
+          const { hits, ms } = await searchDocument(doc, query);
+          setTraces((all) => ({ ...all, [toolCallId]: { hits, ms } }));
+          addToolOutput({ tool, toolCallId, output: searchOutput(query, hits) });
+        } else if (tool === 'readPage') {
+          addToolOutput({ tool, toolCallId, output: readPage(doc, (toolCall.input as { page: number }).page) });
+        } else if (tool === 'getOutline') {
+          addToolOutput({ tool, toolCallId, output: getOutline(doc) });
+        }
       } catch (err) {
-        addToolOutput({
-          tool: 'searchDocument',
-          toolCallId: toolCall.toolCallId,
-          state: 'output-error',
-          errorText: err instanceof Error ? err.message : 'Search failed.',
-        });
+        addToolOutput({ tool, toolCallId, state: 'output-error', errorText: err instanceof Error ? err.message : 'The tool failed.' });
       }
+    },
+    onFinish({ message, messages: history, isAbort, isError, finishReason }) {
+      if (!isAbort && !isError && finishReason !== 'tool-calls' && message.role === 'assistant') selfCheck(message, history);
     },
   });
 
@@ -114,7 +136,7 @@ export function Chat({ doc, onCite }: { doc: LoadedDocument; onCite: (id: number
           ) : (
             <div className="space-y-6">
               {messages.map((message) => (
-                <MessageView key={message.id} message={message} doc={doc} traces={traces} onCite={onCite} />
+                <MessageView key={message.id} message={message} doc={doc} traces={traces} check={checks[message.id]} onCite={onCite} />
               ))}
               {status === 'submitted' && messages.at(-1)?.role === 'user' && (
                 <p className="flex items-center gap-2 pl-11 text-sm text-zinc-500">
@@ -183,7 +205,7 @@ export function Chat({ doc, onCite }: { doc: LoadedDocument; onCite: (id: number
           )}
         </form>
         <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-zinc-500">
-          Answers come only from this PDF and cite their sources. Check anything important.
+          Answers come only from this PDF, cite their sources and are self-checked. Verify anything important.
         </p>
       </div>
     </section>

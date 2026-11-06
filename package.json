@@ -1,8 +1,8 @@
 {
   "name": "devdocer",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
-  "description": "Chat with any PDF: agentic RAG with hybrid search, cited answers and evals.",
+  "description": "Agentic RAG for document question answering: multi-step tool use, hybrid search, page-level citations, self-checked answers and an MCP server.",
   "license": "MIT",
   "engines": {
     "node": ">=20.9.0"
@@ -16,11 +16,13 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "eval": "vitest run --config vitest.eval.config.mts",
+    "mcp": "tsx mcp/stdio.ts",
     "sample:pdf": "./scripts/build-sample-pdf.sh"
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.109",
     "@ai-sdk/react": "4.0.167",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "ai": "7.0.163",
     "lucide-react": "1.69.0",
     "next": "16.4.5",
@@ -38,8 +40,21 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.5",
     "tailwindcss": "4.3.4",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vite": "8.3.6",
     "vitest": "5.1.0"
-  }
+  },
+  "keywords": [
+    "rag",
+    "agentic-ai",
+    "llm",
+    "mcp",
+    "hybrid-search",
+    "bm25",
+    "embeddings",
+    "vercel-ai-sdk",
+    "nextjs",
+    "openai"
+  ]
 }

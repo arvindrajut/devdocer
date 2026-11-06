@@ -11,7 +11,7 @@ export function Workspace({ doc }: { doc: LoadedDocument }) {
 
   return (
     <div className="grid h-full min-h-0 lg:grid-cols-[360px_minmax(0,1fr)]">
-      <DocSidebar doc={doc} cited={cited} onCloseSource={() => setCitation(null)} />
+      <DocSidebar doc={doc} cited={cited} onShowSource={setCitation} onCloseSource={() => setCitation(null)} />
       <Chat doc={doc} onCite={setCitation} />
       {cited && (
         <div className="fixed inset-x-0 bottom-0 z-20 max-h-[55dvh] overflow-y-auto rounded-t-2xl border-t border-zinc-200 bg-white p-4 shadow-2xl lg:hidden dark:border-zinc-800 dark:bg-zinc-900">

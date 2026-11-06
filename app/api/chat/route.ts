@@ -1,13 +1,15 @@
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
+  isToolUIPart,
   streamText,
   toUIMessageStream,
   type UIMessage,
 } from 'ai';
 import { z } from 'zod';
+import { TOOL_INPUTS } from '@/lib/agent/tools';
 import { LIMITS } from '@/lib/config';
-import { SEARCH_TOOL_DESCRIPTION, systemPrompt } from '@/lib/prompt';
+import { systemPrompt, TOOL_DESCRIPTIONS } from '@/lib/prompt';
 import { chatModel, chatModelId, chatProviderOptions, describeAIError, isFakeAI, missingKeyResponse } from '@/lib/server/ai';
 import { rateLimit } from '@/lib/server/rate-limit';
 
@@ -22,17 +24,18 @@ function textOf(message: UIMessage): string {
   return message.parts.map((part) => (part.type === 'text' ? part.text : '')).join('');
 }
 
-/** searchDocument calls the assistant has made since the user's latest question. */
-function searchesThisTurn(messages: UIMessage[]): number {
+/** Tool calls the assistant has made since the user's latest question. */
+function toolCallsThisTurn(messages: UIMessage[]): number {
   const last = messages.at(-1);
   if (!last || last.role !== 'assistant') return 0;
-  return last.parts.filter((part) => part.type === 'tool-searchDocument').length;
+  return last.parts.filter(isToolUIPart).length;
 }
 
 /**
- * Agentic RAG: the model decides when and what to search. searchDocument has no
- * server-side execute function, so the call streams to the browser, which runs
- * hybrid search over its in-memory index and sends the passages back.
+ * Agentic RAG: the model plans its own lookups with three tools (search, read a
+ * page, read the outline). None has a server-side execute function, so each call
+ * streams to the browser, which runs it against its in-memory index and sends the
+ * result back; the chat then resubmits until the model answers.
  */
 export async function POST(request: Request) {
   const limited = rateLimit(request, 'chat', 60, 10 * 60_000);
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
     return Response.json({ error: `Questions can be up to ${LIMITS.maxQuestionChars} characters.` }, { status: 400 });
   }
 
-  const searches = searchesThisTurn(messages);
+  const toolCalls = toolCallsThisTurn(messages);
   const started = Date.now();
   const modelId = isFakeAI() ? 'offline-test-model' : chatModelId();
 
@@ -58,20 +61,17 @@ export async function POST(request: Request) {
     system: systemPrompt(doc),
     messages: await convertToModelMessages(messages),
     tools: {
-      searchDocument: {
-        description: SEARCH_TOOL_DESCRIPTION,
-        inputSchema: z.object({
-          query: z.string().min(2).max(200).describe('A focused search query, e.g. the key terms of the question'),
-        }),
-      },
+      searchDocument: { description: TOOL_DESCRIPTIONS.searchDocument, inputSchema: TOOL_INPUTS.searchDocument },
+      readPage: { description: TOOL_DESCRIPTIONS.readPage, inputSchema: TOOL_INPUTS.readPage },
+      getOutline: { description: TOOL_DESCRIPTIONS.getOutline, inputSchema: TOOL_INPUTS.getOutline },
     },
-    // After the search budget is spent, the model has to answer with what it has.
-    toolChoice: searches >= LIMITS.maxSearchesPerTurn ? 'none' : 'auto',
+    // After the tool budget is spent, the model has to answer with what it has.
+    toolChoice: toolCalls >= LIMITS.maxToolCallsPerTurn ? 'none' : 'auto',
     maxOutputTokens: 1500,
     providerOptions: chatProviderOptions(),
     onEnd({ usage, finishReason }) {
       console.info(
-        JSON.stringify({ event: 'chat', model: modelId, searches, finishReason, tokens: usage.totalTokens, ms: Date.now() - started }),
+        JSON.stringify({ event: 'chat', model: modelId, toolCalls, finishReason, tokens: usage.totalTokens, ms: Date.now() - started }),
       );
     },
   });

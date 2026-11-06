@@ -6,12 +6,12 @@ const sans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
 const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
 
 export const metadata: Metadata = {
-  title: 'DevDocer · Chat with any PDF',
+  title: 'DevDocer · Agentic document Q&A with citations',
   description:
     'Ask questions about a PDF and get answers that cite the page. Agentic RAG with hybrid BM25 + vector search, built with Next.js and the Vercel AI SDK.',
   openGraph: {
-    title: 'DevDocer · Chat with any PDF',
-    description: 'Agentic RAG with hybrid search and cited answers.',
+    title: 'DevDocer · Agentic document Q&A with citations',
+    description: 'Agentic RAG: multi-step tool use, hybrid search, cited and self-checked answers, and an MCP server.',
     type: 'website',
   },
 };

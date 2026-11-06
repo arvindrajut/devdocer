@@ -1,18 +1,17 @@
-import { chunkPages, type Chunk } from '../chunk';
+import type { AgentDocument, Passage } from '../agent/tools';
+import { chunkPages } from '../chunk';
 import { CHUNKING, LIMITS } from '../config';
+import { extractOutline } from '../outline';
 import { DocumentIndex } from '../search';
+import type { GroundingReport } from '../verify';
 
 export class UserFacingError extends Error {}
 
 export type IngestStep = 'read' | 'chunk' | 'embed' | 'suggest';
 export type IngestProgress = { step: IngestStep; done?: number; total?: number };
 
-export type LoadedDocument = {
-  name: string;
+export type LoadedDocument = AgentDocument & {
   sizeBytes: number;
-  pages: number;
-  chunks: Chunk[];
-  index: DocumentIndex;
   embeddingModel: string;
   dimensions: number;
   summary: string | null;
@@ -55,7 +54,7 @@ async function readPdfPages(data: ArrayBuffer): Promise<string[]> {
 
 /**
  * The ingestion pipeline: read pages → split into overlapping chunks → embed in
- * batches → build the hybrid index → ask for a summary and starter questions.
+ * batches → build the hybrid index and outline → ask for a summary and starter questions.
  */
 export async function ingestPdf(
   file: { name: string; size: number; data: ArrayBuffer },
@@ -109,6 +108,7 @@ export async function ingestPdf(
     pages: pages.length,
     chunks,
     index,
+    outline: extractOutline(pages, chunks),
     embeddingModel: model,
     dimensions,
     summary: suggestions.summary,
@@ -123,4 +123,9 @@ export async function searchDocument(doc: LoadedDocument, query: string) {
   const { embeddings } = await embedTexts([query]);
   const hits = doc.index.search(query, embeddings[0]);
   return { hits, ms: performance.now() - started };
+}
+
+/** Asks the server to check each cited claim in an answer against the passages it cites. */
+export function verifyAnswer(question: string, answer: string, passages: Passage[]): Promise<GroundingReport> {
+  return postJson<GroundingReport>('/api/verify', { question, answer, passages });
 }

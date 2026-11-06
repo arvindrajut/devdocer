@@ -1,6 +1,7 @@
 import { openai } from '@ai-sdk/openai';
-import type { LanguageModel } from 'ai';
-import { fakeChatModel } from './fake-ai';
+import { embedMany, type LanguageModel } from 'ai';
+import { EMBEDDING_DIMENSIONS } from '../config';
+import { fakeChatModel, fakeEmbed } from './fake-ai';
 
 /** DEVDOCER_FAKE_AI=1 runs the whole app without an API key (local UI work, tests, CI). */
 export const isFakeAI = () => process.env.DEVDOCER_FAKE_AI === '1';
@@ -14,6 +15,16 @@ export function chatModel(): LanguageModel {
 
 export function embeddingModel() {
   return openai.embeddingModel(embeddingModelId());
+}
+
+/** True when real OpenAI embeddings are available; otherwise server-side callers fall back to offline vectors. */
+export const hasEmbeddingKey = () => !isFakeAI() && Boolean(process.env.OPENAI_API_KEY);
+
+/** Embeddings for server-side callers such as the MCP server, which index a whole PDF in Node. */
+export async function embedOnServer(texts: string[]): Promise<number[][]> {
+  if (!hasEmbeddingKey()) return fakeEmbed(texts);
+  const { embeddings } = await embedMany({ model: embeddingModel(), values: texts, dimensions: EMBEDDING_DIMENSIONS, maxRetries: 2 });
+  return embeddings;
 }
 
 /** Reasoning models answer faster and cheaper at low effort, which is enough for grounded Q&A. */

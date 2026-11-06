@@ -6,6 +6,21 @@ beforeAll(() => {
 });
 
 const doc = { name: 'policy.pdf', pages: 6 };
+const question = { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'How much is the stipend?' }] };
+const searchStep = {
+  type: 'tool-searchDocument',
+  toolCallId: 'call-1',
+  state: 'output-available',
+  input: { query: 'stipend' },
+  output: { query: 'stipend', passages: [{ id: 'S4', page: 4, text: 'The home office stipend is $750.' }] },
+};
+const readStep = {
+  type: 'tool-readPage',
+  toolCallId: 'call-2',
+  state: 'output-available',
+  input: { page: 4 },
+  output: { page: 4, passages: [{ id: 'S4', page: 4, text: 'The home office stipend is $750.' }] },
+};
 
 function request(body: unknown) {
   return new Request('http://localhost/api/chat', {
@@ -17,40 +32,34 @@ function request(body: unknown) {
 
 describe('POST /api/chat (offline test model)', () => {
   it('asks the browser to run searchDocument first', async () => {
-    const response = await POST(
-      request({ doc, messages: [{ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'How much is the stipend?' }] }] }),
-    );
+    const response = await POST(request({ doc, messages: [question] }));
     expect(response.status).toBe(200);
     const stream = await response.text();
     expect(stream).toContain('"toolName":"searchDocument"');
     expect(stream).toContain('How much is the stipend?');
   });
 
-  it('answers with citations once passages come back', async () => {
+  it('reads the page of the best hit as a second step', async () => {
+    const response = await POST(request({ doc, messages: [question, { id: 'a1', role: 'assistant', parts: [searchStep] }] }));
+    const stream = await response.text();
+    expect(stream).toContain('"toolName":"readPage"');
+    expect(stream).toContain('"page":4');
+  });
+
+  it('answers with citations once the tools have returned', async () => {
     const response = await POST(
-      request({
-        doc,
-        messages: [
-          { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'How much is the stipend?' }] },
-          {
-            id: 'a1',
-            role: 'assistant',
-            parts: [
-              {
-                type: 'tool-searchDocument',
-                toolCallId: 'call-1',
-                state: 'output-available',
-                input: { query: 'stipend' },
-                output: { query: 'stipend', passages: [{ id: 'S4', page: 4, text: 'The home office stipend is $750.' }] },
-              },
-            ],
-          },
-        ],
-      }),
+      request({ doc, messages: [question, { id: 'a1', role: 'assistant', parts: [searchStep, readStep] }] }),
     );
     const stream = await response.text();
     expect(stream).toContain('[S4]');
     expect(stream).toContain('$750');
+  });
+
+  it('reads the outline for questions about structure', async () => {
+    const response = await POST(
+      request({ doc, messages: [{ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'What sections does it have?' }] }] }),
+    );
+    expect(await response.text()).toContain('"toolName":"getOutline"');
   });
 
   it('rejects malformed requests', async () => {

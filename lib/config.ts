@@ -7,9 +7,12 @@ export const LIMITS = {
   embedBatch: 96,
   maxChunkChars: 4000,
   maxQuestionChars: 1000,
-  /** How many times the model may call searchDocument before it must answer. */
-  maxSearchesPerTurn: 3,
+  /** Tool calls (searches, page reads, outline lookups) the agent may make before it must answer. */
+  maxToolCallsPerTurn: 6,
   maxMessages: 40,
+  /** Self-check: the longest answer and the most cited passages it will verify. */
+  maxAnswerChars: 6000,
+  maxVerifyPassages: 12,
 } as const;
 
 /** Recursive character splitting, measured in characters (about 4 per token). */

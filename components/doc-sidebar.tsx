@@ -1,4 +1,4 @@
-import { FileText, MousePointerClick, Settings2, X } from 'lucide-react';
+import { FileText, ListTree, MousePointerClick, Settings2, X } from 'lucide-react';
 import type { LoadedDocument } from '@/lib/client/ingest';
 import type { Chunk } from '@/lib/chunk';
 import { CHUNKING, LIMITS, RETRIEVAL } from '@/lib/config';
@@ -32,10 +32,12 @@ export function SourceViewer({ chunk, onClose }: { chunk: Chunk; onClose: () => 
 export function DocSidebar({
   doc,
   cited,
+  onShowSource,
   onCloseSource,
 }: {
   doc: LoadedDocument;
   cited?: Chunk;
+  onShowSource: (id: number) => void;
   onCloseSource: () => void;
 }) {
   const stats: [string, string][] = [
@@ -43,7 +45,8 @@ export function DocSidebar({
     ['Chunks', `${doc.chunks.length} × ~${CHUNKING.maxChars} chars, ${CHUNKING.overlap} overlap`],
     ['Embeddings', `${doc.embeddingModel} (${doc.dimensions}d)`],
     ['Retrieval', `BM25 + vector, RRF k=${RETRIEVAL.rrfK}, top ${RETRIEVAL.topK}`],
-    ['Agent', `up to ${LIMITS.maxSearchesPerTurn} searches per question`],
+    ['Agent', `search, read page, outline · up to ${LIMITS.maxToolCallsPerTurn} tool calls per question`],
+    ['Self-check', 'each cited claim judged against its source'],
     ['Read + embed', `${(doc.timings.readMs / 1000).toFixed(1)} s + ${(doc.timings.embedMs / 1000).toFixed(1)} s`],
   ];
 
@@ -75,6 +78,30 @@ export function DocSidebar({
           </p>
         )}
       </section>
+
+      {doc.outline.length > 0 && (
+        <details className="group rounded-xl border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+          <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
+            <ListTree className="size-4 text-zinc-500" aria-hidden />
+            Outline
+            <span className="ml-auto text-xs font-normal text-zinc-400">{doc.outline.length} sections</span>
+          </summary>
+          <ol className="mt-3 max-h-72 space-y-0.5 overflow-y-auto">
+            {doc.outline.map((entry, i) => (
+              <li key={i} style={{ paddingLeft: `${(Math.min(entry.level, 4) - 1) * 12}px` }}>
+                <button
+                  type="button"
+                  onClick={() => onShowSource(entry.chunkId)}
+                  className="flex w-full items-baseline gap-2 rounded-md px-1.5 py-1 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  <span className="min-w-0 flex-1 truncate">{entry.title}</span>
+                  <span className="shrink-0 font-mono text-[11px] text-zinc-400">p.{entry.page}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
 
       <details className="group rounded-xl border border-zinc-200 p-4 text-sm dark:border-zinc-800" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">

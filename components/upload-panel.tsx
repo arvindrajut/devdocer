@@ -1,24 +1,34 @@
 'use client';
 
-import { AlertCircle, Bot, FileUp, Gauge, Layers, Quote, Sparkles } from 'lucide-react';
+import { AlertCircle, Bot, FileUp, Gauge, Layers, Plug, Quote, ShieldCheck, Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { LIMITS, RETRIEVAL } from '@/lib/config';
 
 const FEATURES = [
+  {
+    icon: Bot,
+    title: 'Multi-step agent',
+    body: `The model plans its own lookups with three tools (search, read a page, read the outline) and can search again with new wording, up to ${LIMITS.maxToolCallsPerTurn} calls per question.`,
+  },
   {
     icon: Layers,
     title: 'Hybrid retrieval',
     body: `BM25 keyword search and embedding search run side by side and are merged with reciprocal rank fusion (k = ${RETRIEVAL.rrfK}), so exact terms and paraphrases both land.`,
   },
   {
-    icon: Bot,
-    title: 'Agentic search',
-    body: `The model decides what to search for through tool calling, and can rephrase and search again, up to ${LIMITS.maxSearchesPerTurn} times per question.`,
-  },
-  {
     icon: Quote,
     title: 'Cited, grounded answers',
     body: 'Every claim links to the passage and page it came from. If the document does not say, it says so instead of guessing.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Self-checked',
+    body: 'After answering, a second model call judges each cited claim against its source and flags anything the passage does not support.',
+  },
+  {
+    icon: Plug,
+    title: 'MCP server',
+    body: 'The same tools run as an MCP server, so Claude Code, Claude Desktop or any MCP client can search a PDF and cite it.',
   },
   {
     icon: Gauge,
@@ -29,9 +39,10 @@ const FEATURES = [
 
 const STEPS = [
   ['Read', 'pdf.js extracts text page by page in your browser'],
-  ['Chunk', 'Recursive splitting into ~1,200-character overlapping chunks'],
+  ['Chunk', '~1,200-character overlapping chunks, plus a section outline'],
   ['Embed', 'OpenAI text-embedding-3-small, 512 dimensions'],
-  ['Ask', 'The model searches the index and answers with citations'],
+  ['Plan & search', 'The agent calls its tools until it can answer, with citations'],
+  ['Verify', 'Each cited claim is checked against its passage'],
 ];
 
 export function UploadPanel({
@@ -58,7 +69,7 @@ export function UploadPanel({
       <div className="mx-auto flex max-w-4xl flex-col items-center px-4 pt-12 pb-16 sm:pt-20">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:border-brand-900 dark:bg-brand-900/30 dark:text-brand-200">
           <Sparkles className="size-3.5" aria-hidden />
-          Agentic RAG · Hybrid search · Cited answers
+          Agentic RAG · Hybrid search · Self-checked answers · MCP
         </span>
         <h1 className="mt-5 text-center text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
           Ask any PDF a question. <span className="text-brand-600 dark:text-brand-400">Get the page it came from.</span>
@@ -127,7 +138,7 @@ export function UploadPanel({
           questions, and nothing is stored on the server.
         </p>
 
-        <section className="mt-16 grid w-full gap-4 sm:grid-cols-2" aria-label="Features">
+        <section className="mt-16 grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Features">
           {FEATURES.map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
               <Icon className="size-5 text-brand-600 dark:text-brand-400" aria-hidden />
@@ -139,7 +150,7 @@ export function UploadPanel({
 
         <section id="how" className="mt-12 w-full" aria-label="How it works">
           <h2 className="text-center text-sm font-semibold tracking-wide text-zinc-500 uppercase">How it works</h2>
-          <ol className="mt-4 grid gap-3 sm:grid-cols-4">
+          <ol className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {STEPS.map(([title, body], i) => (
               <li key={title} className="rounded-xl bg-zinc-100/70 p-4 dark:bg-zinc-900/70">
                 <span className="font-mono text-xs text-brand-600 dark:text-brand-400">0{i + 1}</span>
